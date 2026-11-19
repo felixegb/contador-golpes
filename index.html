@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0f1412">
+<title>Contador de golpes</title>
+<style>
+  :root {
+    --bg: #0f1412;
+    --panel: #18201c;
+    --line: #26302b;
+    --text: #e8efe9;
+    --muted: #8a9890;
+    --accent: #c8f04a;      /* amarillo pelota */
+    --low: #4fb3a9;
+    --mid: #e8c547;
+    --high: #f0644a;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  h1 { font-size: 20px; margin: 0; flex: 1; letter-spacing: .2px; }
+  h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; }
+  .estado { font-size: 13px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .estado.on { color: var(--accent); border-color: var(--accent); }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border-radius: 10px; padding: 10px 16px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  }
+  button.primario { background: var(--accent); color: #142000; border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: default; }
+  .aviso { background: #3a2a18; border: 1px solid #6b4a22; color: #f3d3a6; padding: 12px 14px; border-radius: var(--radius); margin-bottom: 16px; }
+  .grid { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .contador { font-size: clamp(72px, 18vw, 132px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .sub { color: var(--muted); font-size: 14px; }
+  .ultimo { display: flex; align-items: baseline; gap: 10px; }
+  .ultimo .valor { font-size: 56px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+  .barra { height: 12px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 14px 0 10px; }
+  .barra > div { height: 100%; width: 0; border-radius: 999px; transition: width .25s ease, background .25s; }
+  .datos { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
+  .datos b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  @media (max-width: 680px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat .n { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 12px; color: var(--muted); }
+  .ancho { grid-column: 1 / -1; }
+  svg { display: block; width: 100%; height: 160px; }
+  .controles { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .controles label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 240px; font-size: 14px; }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .tabla-scroll { max-height: 280px; overflow: auto; }
+  .vacio { color: var(--muted); font-size: 14px; padding: 8px 0; }
+  .flash { animation: flash .35s ease; }
+  @keyframes flash { from { color: var(--accent); transform: scale(1.04); } to { color: inherit; transform: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🎾 Contador de golpes</h1>
+    <span id="estado" class="estado">Desconectado</span>
+    <button id="btnConectar" class="primario">Conectar raqueta</button>
+  </header>
+
+  <div id="avisoNav" class="aviso" hidden>
+    Este navegador no soporta Web Bluetooth. Usa Chrome o Edge en el PC, o Chrome en Android
+    (en iPhone no funciona). La página debe abrirse desde <code>localhost</code> o <code>https</code>.
+  </div>
+
+  <div class="grid">
+    <section class="panel">
+      <h2>Golpes</h2>
+      <div id="contador" class="contador">0</div>
+      <div id="perdidos" class="sub"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Último golpe</h2>
+      <div class="ultimo"><span id="ultInt" class="valor">–</span><span class="sub">/ 100 intensidad</span></div>
+      <div class="barra"><div id="ultBarra"></div></div>
+      <div class="datos">
+        <span>Pico <b id="ultG">–</b> g</span>
+        <span>Giro <b id="ultW">–</b> °/s</span>
+        <span id="ultSat"></span>
+      </div>
+    </section>
+
+    <section class="panel ancho">
+      <div class="stats">
+        <div class="stat"><div id="stMedia" class="n">–</div><div class="l">Intensidad media</div></div>
+        <div class="stat"><div id="stMax" class="n">–</div><div class="l">Intensidad máxima</div></div>
+        <div class="stat"><div id="stG" class="n">–</div><div class="l">Pico máximo (g)</div></div>
+        <div class="stat"><div id="stRitmo" class="n">–</div><div class="l">Golpes / min (último min)</div></div>
+      </div>
+    </section>
+
+    <section class="panel ancho">
+      <h2>Intensidad de los últimos 40 golpes</h2>
+      <svg id="grafica" viewBox="0 0 400 160" preserveAspectRatio="none" role="img" aria-label="Intensidad de los últimos golpes"></svg>
+    </section>
+
+    <section class="panel ancho">
+      <h2>Ajustes</h2>
+      <div class="controles">
+        <label>Umbral
+          <input id="umbral" type="range" min="1.5" max="12" step="0.5" value="3" disabled>
+          <b id="umbralTxt">3.0 g</b>
+        </label>
+        <button id="btnCero" disabled>Contador a cero</button>
+        <button id="btnCsv">Exportar CSV</button>
+      </div>
+      <p class="sub">Umbral bajo = cuenta golpes suaves (y más falsos positivos). Umbral alto = solo golpes fuertes.</p>
+    </section>
+
+    <section class="panel ancho">
+      <h2>Historial</h2>
+      <div class="tabla-scroll">
+        <table>
+          <thead><tr><th>#</th><th>Hora</th><th>Intensidad</th><th>Pico (g)</th><th>Giro (°/s)</th></tr></thead>
+          <tbody id="tabla"></tbody>
+        </table>
+        <div id="tablaVacia" class="vacio">Aún no hay golpes. Conecta la raqueta y empieza a pelotear.</div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const SERVICIO = 'a7e10000-4c8b-4f6e-9b1a-2f5e6c7d8e90';
+const CH_GOLPE = 'a7e10001-4c8b-4f6e-9b1a-2f5e6c7d8e90';
+const CH_UMBRAL = 'a7e10002-4c8b-4f6e-9b1a-2f5e6c7d8e90';
+const CH_CONTROL = 'a7e10003-4c8b-4f6e-9b1a-2f5e6c7d8e90';
+
+const $ = id => document.getElementById(id);
+let dispositivo = null, chUmbral = null, chControl = null;
+let golpes = [];          // {n, hora, intensidad, g, dps, sat}
+let ultimoNumero = 0, perdidos = 0;
+let desconexionManual = false;
+
+if (!navigator.bluetooth) { $('avisoNav').hidden = false; $('btnConectar').disabled = true; }
+
+function color(i) { return i < 34 ? 'var(--low)' : i < 67 ? 'var(--mid)' : 'var(--high)'; }
+
+function ponerEstado(texto, on) {
+  $('estado').textContent = texto;
+  $('estado').classList.toggle('on', !!on);
+  $('btnConectar').textContent = on ? 'Desconectar' : 'Conectar raqueta';
+  $('umbral').disabled = !on; $('btnCero').disabled = !on;
+}
+
+async function conectar() {
+  if (dispositivo && dispositivo.gatt.connected) { desconexionManual = true; dispositivo.gatt.disconnect(); return; }
+  try {
+    if (!dispositivo) {
+      dispositivo = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICIO] }] });
+      dispositivo.addEventListener('gattserverdisconnected', alDesconectar);
+    }
+    ponerEstado('Conectando…');
+    const server = await dispositivo.gatt.connect();
+    const srv = await server.getPrimaryService(SERVICIO);
+    const chGolpe = await srv.getCharacteristic(CH_GOLPE);
+    chUmbral = await srv.getCharacteristic(CH_UMBRAL);
+    chControl = await srv.getCharacteristic(CH_CONTROL);
+
+    mostrarUmbral((await chUmbral.readValue()).getUint8(0) / 10);
+    await chUmbral.startNotifications();
+    chUmbral.addEventListener('characteristicvaluechanged', e => mostrarUmbral(e.target.value.getUint8(0) / 10));
+
+    // El ultimo numero de golpe que tiene la placa sirve de referencia para detectar perdidas
+    ultimoNumero = (await chGolpe.readValue()).getUint16(0, true);
+    await chGolpe.startNotifications();
+    chGolpe.addEventListener('characteristicvaluechanged', e => alGolpe(e.target.value));
+    ponerEstado('Conectado: ' + (dispositivo.name || 'raqueta'), true);
+    mantenerPantalla();
+  } catch (err) {
+    if (err.name !== 'NotFoundError') alert('No se pudo conectar: ' + err.message);
+    ponerEstado('Desconectado');
+  }
+}
+
+// Mantener la pantalla encendida mientras hay raqueta conectada (si el navegador lo permite)
+let bloqueoPantalla = null;
+async function mantenerPantalla() {
+  if (!('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+  if (!dispositivo || !dispositivo.gatt.connected) return;
+  try { bloqueoPantalla = await navigator.wakeLock.request('screen'); } catch (_) { /* sin permiso: no pasa nada */ }
+}
+document.addEventListener('visibilitychange', mantenerPantalla);
+
+function alDesconectar() {
+  if (bloqueoPantalla) { bloqueoPantalla.release().catch(() => {}); bloqueoPantalla = null; }
+  ponerEstado('Desconectado');
+  if (!desconexionManual) { ponerEstado('Reconectando…'); setTimeout(conectar, 1000); }
+  desconexionManual = false;
+}
+
+function alGolpe(dv) {
+  const n = dv.getUint16(0, true);
+  if (n === 0) { ultimoNumero = 0; return; }   // la placa se puso a cero
+  if (ultimoNumero && n > ultimoNumero + 1) perdidos += n - ultimoNumero - 1;
+  ultimoNumero = n;
+  const g = {
+    n: golpes.length + 1,
+    hora: new Date(),
+    g: dv.getUint16(2, true) / 100,
+    dps: dv.getUint16(4, true),
+    intensidad: dv.getUint8(6),
+    sat: (dv.getUint8(7) & 1) === 1,
+  };
+  golpes.push(g);
+  pintar(g);
+}
+
+function mostrarUmbral(u) { $('umbral').value = u; $('umbralTxt').textContent = u.toFixed(1) + ' g'; }
+
+// pintar(golpe) = golpe nuevo, pintar(null) = sesion borrada, pintar() = solo refrescar estadisticas
+function pintar(ult) {
+  $('contador').textContent = golpes.length;
+  if (ult) { $('contador').classList.remove('flash'); void $('contador').offsetWidth; $('contador').classList.add('flash'); }
+  $('perdidos').textContent = perdidos ? `${perdidos} golpe(s) no recibidos por Bluetooth` : '';
+
+  if (ult) {
+    $('ultInt').textContent = ult.intensidad;
+    $('ultBarra').style.width = ult.intensidad + '%';
+    $('ultBarra').style.background = color(ult.intensidad);
+    $('ultG').textContent = ult.g.toFixed(1);
+    $('ultW').textContent = ult.dps;
+    $('ultSat').textContent = ult.sat ? '⚠ sensor al máximo' : '';
+  } else if (ult === null) {
+    ['ultInt', 'ultG', 'ultW'].forEach(id => $(id).textContent = '–');
+    $('ultBarra').style.width = 0; $('ultSat').textContent = '';
+  }
+
+  if (golpes.length) {
+    const ints = golpes.map(x => x.intensidad);
+    $('stMedia').textContent = Math.round(ints.reduce((a, b) => a + b, 0) / ints.length);
+    $('stMax').textContent = Math.max(...ints);
+    $('stG').textContent = Math.max(...golpes.map(x => x.g)).toFixed(1);
+    const haceUnMin = Date.now() - 60000;
+    $('stRitmo').textContent = golpes.filter(x => x.hora >= haceUnMin).length;
+  } else {
+    ['stMedia', 'stMax', 'stG', 'stRitmo'].forEach(id => $(id).textContent = '–');
+  }
+
+  // Grafica de barras
+  const ultimos = golpes.slice(-40), N = 40, W = 400, H = 160, paso = W / N;
+  let svg = '';
+  [25, 50, 75].forEach(v => svg += `<line x1="0" x2="${W}" y1="${H - v / 100 * H}" y2="${H - v / 100 * H}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>`);
+  ultimos.forEach((x, i) => {
+    const h = Math.max(2, x.intensidad / 100 * H);
+    svg += `<rect x="${i * paso + paso * .15}" y="${H - h}" width="${paso * .7}" height="${h}" rx="2" fill="${color(x.intensidad)}"><title>#${x.n}: ${x.intensidad}</title></rect>`;
+  });
+  $('grafica').innerHTML = svg;
+
+  // Tabla (ultimo arriba)
+  $('tablaVacia').hidden = golpes.length > 0;
+  if (ult) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${ult.n}</td><td>${ult.hora.toLocaleTimeString()}</td><td style="color:${color(ult.intensidad)}">${ult.intensidad}</td><td>${ult.g.toFixed(1)}${ult.sat ? ' ⚠' : ''}</td><td>${ult.dps}</td>`;
+    $('tabla').prepend(tr);
+  } else if (ult === null) {
+    $('tabla').innerHTML = '';
+  }
+}
+
+$('btnConectar').onclick = conectar;
+$('umbral').oninput = e => $('umbralTxt').textContent = (+e.target.value).toFixed(1) + ' g';
+$('umbral').onchange = async e => { if (chUmbral) await chUmbral.writeValue(Uint8Array.of(Math.round(e.target.value * 10))); };
+$('btnCero').onclick = async () => {
+  if (golpes.length && !confirm('¿Borrar los golpes de esta sesión?')) return;
+  if (chControl) await chControl.writeValue(Uint8Array.of(0));
+  golpes = []; perdidos = 0; pintar(null);
+};
+$('btnCsv').onclick = () => {
+  const filas = ['numero,hora,intensidad,pico_g,giro_dps,saturado',
+    ...golpes.map(x => [x.n, x.hora.toISOString(), x.intensidad, x.g, x.dps, x.sat ? 1 : 0].join(','))];
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([filas.join('\n')], { type: 'text/csv' }));
+  a.download = `golpes-${new Date().toISOString().slice(0, 16).replace(':', '')}.csv`;
+  a.click();
+};
+setInterval(() => { if (golpes.length) pintar(); }, 10000);  // refresca "golpes/min"
+
+// Modo demo para probar la interfaz sin placa: abre la pagina con ?demo
+if (new URLSearchParams(location.search).has('demo')) {
+  const b = document.createElement('button'); b.textContent = 'Simular golpe';
+  b.onclick = () => {
+    const i = Math.round(Math.random() * 100), dv = new DataView(new ArrayBuffer(12));
+    dv.setUint16(0, ultimoNumero + 1, true); dv.setUint16(2, Math.round((3 + i / 100 * 13) * 100), true);
+    dv.setUint16(4, Math.round(300 + i * 15), true); dv.setUint8(6, i); dv.setUint8(7, i > 97 ? 1 : 0);
+    alGolpe(dv);
+  };
+  document.querySelector('header').appendChild(b);
+}
+</script>
+</body>
+</html>
