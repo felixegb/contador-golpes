@@ -16,6 +16,8 @@
     --low: #4fb3a9;
     --mid: #e8c547;
     --high: #f0644a;
+    --derecha: #6aa9f0;
+    --reves: #c58af0;
     --radius: 14px;
   }
   * { box-sizing: border-box; }
@@ -36,7 +38,7 @@
   .bateria.baja { color: var(--high); border-color: var(--high); }
   .bateria.baja .nivel { background: var(--high); }
   .bateria .v { color: var(--muted); }
-  button {
+  button, select {
     font: inherit; font-weight: 600; cursor: pointer; border-radius: 10px; padding: 10px 16px;
     border: 1px solid var(--line); background: var(--panel); color: var(--text);
   }
@@ -45,7 +47,8 @@
   .aviso { background: #3a2a18; border: 1px solid #6b4a22; color: #f3d3a6; padding: 12px 14px; border-radius: var(--radius); margin-bottom: 16px; }
   .grid { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
   @media (max-width: 680px) { .grid { grid-template-columns: 1fr; } }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; min-width: 0; }
+  .panel-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .contador { font-size: clamp(72px, 18vw, 132px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
   .sub { color: var(--muted); font-size: 14px; }
   .ultimo { display: flex; align-items: baseline; gap: 10px; }
@@ -54,14 +57,27 @@
   .barra > div { height: 100%; width: 0; border-radius: 999px; transition: width .25s ease, background .25s; }
   .datos { display: flex; gap: 18px; flex-wrap: wrap; font-size: 14px; color: var(--muted); }
   .datos b { color: var(--text); font-variant-numeric: tabular-nums; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .tipo { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; border: 1px solid currentColor; text-transform: uppercase; letter-spacing: .06em; }
+  .tipo.derecha { color: var(--derecha); }
+  .tipo.reves { color: var(--reves); }
+  .tipo.otro, .tipo.nocal { color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px 10px; }
   @media (max-width: 680px) { .stats { grid-template-columns: repeat(2, 1fr); } }
   .stat .n { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .n small { font-size: 14px; font-weight: 600; color: var(--muted); }
   .stat .l { font-size: 12px; color: var(--muted); }
+  .bien { color: var(--accent); }
+  .mal { color: var(--high); }
+  .reparto { height: 10px; border-radius: 999px; overflow: hidden; display: flex; background: var(--line); margin-top: 8px; }
+  .reparto > div { height: 100%; }
   .ancho { grid-column: 1 / -1; }
   svg { display: block; width: 100%; height: 160px; }
+  .leyenda { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .leyenda i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; background: var(--accent); }
   .controles { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
-  .controles label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 240px; font-size: 14px; }
+  .controles + .controles { margin-top: 14px; }
+  .controles label { display: flex; align-items: center; gap: 10px; flex: 1; min-width: min(240px, 100%); font-size: 14px; }
+  th, td { white-space: nowrap; }
   input[type=range] { flex: 1; accent-color: var(--accent); }
   table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
   th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); }
@@ -98,28 +114,49 @@
     </section>
 
     <section class="panel">
-      <h2>Último golpe</h2>
+      <div class="panel-cab"><h2>Último golpe</h2><span id="ultTipo"></span></div>
       <div class="ultimo"><span id="ultInt" class="valor">–</span><span class="sub">/ 100 intensidad</span></div>
       <div class="barra"><div id="ultBarra"></div></div>
       <div class="datos">
+        <span>Velocidad <b id="ultVel">–</b> km/h</span>
         <span>Pico <b id="ultG">–</b> g</span>
-        <span>Giro <b id="ultW">–</b> °/s</span>
         <span id="ultSat"></span>
       </div>
     </section>
 
     <section class="panel ancho">
+      <h2>Golpeo</h2>
       <div class="stats">
         <div class="stat"><div id="stMedia" class="n">–</div><div class="l">Intensidad media</div></div>
         <div class="stat"><div id="stMax" class="n">–</div><div class="l">Intensidad máxima</div></div>
-        <div class="stat"><div id="stG" class="n">–</div><div class="l">Pico máximo (g)</div></div>
+        <div class="stat"><div id="stVelMedia" class="n">–</div><div class="l">Velocidad media (km/h)</div></div>
+        <div class="stat"><div id="stVelMax" class="n">–</div><div class="l">Velocidad máxima (km/h)</div></div>
+        <div class="stat ancho">
+          <div class="n"><span style="color:var(--derecha)" id="stDer">–</span> <small>derechas</small> · <span style="color:var(--reves)" id="stRev">–</span> <small>reveses</small> · <span id="stOtro">–</span> <small>otros</small></div>
+          <div class="reparto"><div id="repDer" style="background:var(--derecha)"></div><div id="repRev" style="background:var(--reves)"></div><div id="repOtro" style="background:var(--muted)"></div></div>
+          <div class="l" id="stRepartoNota">Calibra la derecha en Ajustes para separar derechas y reveses.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel ancho">
+      <h2>Peloteos y ritmo</h2>
+      <div class="stats">
+        <div class="stat"><div id="stPeloteos" class="n">–</div><div class="l">Peloteos (2+ golpes)</div></div>
+        <div class="stat"><div id="stPorPeloteo" class="n">–</div><div class="l">Golpes por peloteo (media)</div></div>
+        <div class="stat"><div id="stPeloteoMax" class="n">–</div><div class="l">Peloteo más largo</div></div>
+        <div class="stat"><div id="stActual" class="n">–</div><div class="l">Peloteo actual</div></div>
+        <div class="stat"><div id="stJuego" class="n">–</div><div class="l">Tiempo jugando</div></div>
+        <div class="stat"><div id="stDescanso" class="n">–</div><div class="l">Tiempo de descanso</div></div>
         <div class="stat"><div id="stRitmo" class="n">–</div><div class="l">Golpes / min (último min)</div></div>
+        <div class="stat"><div id="stTendencia" class="n">–</div><div class="l" id="stTendenciaNota">Potencia: final vs inicio</div></div>
       </div>
     </section>
 
     <section class="panel ancho">
       <h2>Intensidad de los últimos 40 golpes</h2>
       <svg id="grafica" viewBox="0 0 400 160" preserveAspectRatio="none" role="img" aria-label="Intensidad de los últimos golpes"></svg>
+      <div class="leyenda"><span><i></i>Media de los últimos 5 golpes (tendencia)</span></div>
     </section>
 
     <section class="panel ancho">
@@ -133,14 +170,26 @@
         <button id="btnApagar" disabled>Apagar raqueta</button>
         <button id="btnCsv">Exportar CSV</button>
       </div>
-      <p class="sub">Umbral bajo = cuenta golpes suaves (y más falsos positivos). Umbral alto = solo golpes fuertes.</p>
+      <div class="controles">
+        <label style="flex:0 1 auto;min-width:0">Deporte
+          <select id="deporte">
+            <option value="padel">Pádel</option>
+            <option value="tenis">Tenis</option>
+          </select>
+        </label>
+        <button id="btnCalibrar">Calibrar derecha</button>
+        <span id="calibEstado" class="sub"></span>
+      </div>
+      <p class="sub">Umbral bajo = cuenta golpes suaves (y más falsos positivos). Umbral alto = solo golpes fuertes.<br>
+        Calibrar: pulsa el botón y da 3 derechas normales. Funciona con cualquier orientación de la placa y para zurdos.<br>
+        La velocidad es una estimación (giro de la raqueta × distancia del mango al centro de la pala), útil para comparar tus golpes entre sí.</p>
     </section>
 
     <section class="panel ancho">
       <h2>Historial</h2>
       <div class="tabla-scroll">
         <table>
-          <thead><tr><th>#</th><th>Hora</th><th>Intensidad</th><th>Pico (g)</th><th>Giro (°/s)</th></tr></thead>
+          <thead><tr><th>#</th><th>Hora</th><th>Tipo</th><th>Intensidad</th><th>km/h</th><th>Pico (g)</th><th>Peloteo</th></tr></thead>
           <tbody id="tabla"></tbody>
         </table>
         <div id="tablaVacia" class="vacio">Aún no hay golpes. Conecta la raqueta y empieza a pelotear.</div>
@@ -156,12 +205,26 @@ const CH_UMBRAL = 'a7e10002-4c8b-4f6e-9b1a-2f5e6c7d8e90';
 const CH_CONTROL = 'a7e10003-4c8b-4f6e-9b1a-2f5e6c7d8e90';
 const CH_BATERIA = 'a7e10004-4c8b-4f6e-9b1a-2f5e6c7d8e90';
 
+// Distancia aproximada del sensor (extremo del mango) al centro de la pala, en metros
+const RADIO = { padel: 0.33, tenis: 0.50 };
+const MAX_DPS = 2000;               // limite del giroscopio
+const PAUSA_PELOTEO_MS = 6000;      // mas de 6 s sin golpes = peloteo nuevo
+const SIMILITUD_TIPO = 0.3;         // |coseno| minimo para decidir derecha / reves
+const GOLPES_CALIBRACION = 3;
+
 const $ = id => document.getElementById(id);
 let dispositivo = null, chUmbral = null, chControl = null;
-let golpes = [];          // {n, hora, intensidad, g, dps, sat}
+let golpes = [];          // {n, hora, intensidad, g, dps, sat, swing, v:[gx,gy,gz]}
 let ultimoNumero = 0, perdidos = 0;
 let desconexionManual = false;
 let enReposo = false, reintento = null;
+
+// Ajustes guardados en este navegador (localStorage puede fallar: modo privado, etc.)
+const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} };
+const leer = (k, def) => { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch (_) { return def; } };
+let deporte = leer('deporte', 'padel');
+let calib = leer('calibDerecha', null);        // vector unitario [x,y,z] de una derecha
+let calibrando = 0, calibSuma = [0, 0, 0];
 
 // Manejadores con nombre: al reconectar, Chrome devuelve las mismas caracteristicas y
 // addEventListener con la misma funcion no la duplica (si no, cada golpe contaria doble).
@@ -180,6 +243,7 @@ function ponerEstado(texto, on) {
   $('umbral').disabled = !on; $('btnCero').disabled = !on; $('btnApagar').disabled = !on;
 }
 
+// ---------- Conexion ----------
 // silencioso = reintento automatico (sin alertas ni cambios de estado si falla)
 async function conectar(silencioso = false) {
   if (!silencioso) clearTimeout(reintento);
@@ -250,23 +314,82 @@ function alDesconectar() {
   desconexionManual = false;
 }
 
-function alGolpe(dv) {
+// ---------- Datos de cada golpe ----------
+function alGolpe(dv, hora = new Date()) {
   const n = dv.getUint16(0, true);
   if (n === 0) { ultimoNumero = 0; return; }   // la placa se puso a cero
   if (ultimoNumero && n > ultimoNumero + 1) perdidos += n - ultimoNumero - 1;
   ultimoNumero = n;
   const g = {
     n: golpes.length + 1,
-    hora: new Date(),
+    hora,
     g: dv.getUint16(2, true) / 100,
     dps: dv.getUint16(4, true),
     intensidad: dv.getUint8(6),
     sat: (dv.getUint8(7) & 1) === 1,
+    swing: null, v: null,
   };
+  if (dv.byteLength >= 20) {   // firmware con datos de swing
+    g.swing = dv.getUint16(12, true);
+    g.v = [dv.getInt16(14, true), dv.getInt16(16, true), dv.getInt16(18, true)];
+  }
   golpes.push(g);
+  if (calibrando && g.v) sumarCalibracion(g.v);
   pintar(g);
 }
 
+const norma = v => Math.hypot(v[0], v[1], v[2]);
+const unitario = v => { const m = norma(v); return m ? v.map(x => x / m) : null; };
+
+// Velocidad estimada del centro de la pala en km/h (null si no hay datos)
+function velocidad(g) {
+  if (g.swing == null) return null;
+  return g.swing * Math.PI / 180 * RADIO[deporte] * 3.6;
+}
+const velSaturada = g => g.swing != null && g.swing >= MAX_DPS * 0.98;
+const textoVel = g => { const v = velocidad(g); return v == null ? '–' : (velSaturada(g) ? '≥' : '') + Math.round(v); };
+
+// 'derecha' | 'reves' | 'otro' (saque, remate, volea rara...) | null (sin calibrar o sin datos)
+function tipoGolpe(g) {
+  if (!calib || !g.v || norma(g.v) < 50) return null;
+  const u = unitario(g.v);
+  const c = u[0] * calib[0] + u[1] * calib[1] + u[2] * calib[2];
+  return c > SIMILITUD_TIPO ? 'derecha' : c < -SIMILITUD_TIPO ? 'reves' : 'otro';
+}
+const NOMBRE_TIPO = { derecha: 'Derecha', reves: 'Revés', otro: 'Otro' };
+
+function sumarCalibracion(v) {
+  const u = unitario(v); if (!u) return;
+  calibSuma = calibSuma.map((s, i) => s + u[i]);
+  calibrando--;
+  if (calibrando > 0) {
+    $('calibEstado').textContent = `Da ${calibrando} derecha${calibrando > 1 ? 's' : ''} más…`;
+  } else {
+    calib = unitario(calibSuma);
+    guardar('calibDerecha', calib);
+    $('btnCalibrar').textContent = 'Recalibrar derecha';
+    $('calibEstado').textContent = 'Calibrado ✓';
+    redibujarTabla();
+  }
+}
+
+// Agrupa los golpes en peloteos: una pausa de mas de PAUSA_PELOTEO_MS empieza uno nuevo
+function peloteos() {
+  const lista = [];
+  for (const g of golpes) {
+    const ult = lista[lista.length - 1];
+    if (ult && g.hora - ult[ult.length - 1].hora <= PAUSA_PELOTEO_MS) ult.push(g);
+    else lista.push([g]);
+  }
+  golpes.forEach(g => g.peloteo = 0);
+  lista.forEach((p, i) => p.forEach(g => g.peloteo = i + 1));
+  return lista;
+}
+
+const mmss = ms => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const media = a => a.reduce((x, y) => x + y, 0) / a.length;
+
+// ---------- Bateria y umbral ----------
 function mostrarBateria(dv) {
   const mv = dv.getUint16(0, true), pct = dv.getUint8(2), flags = dv.getUint8(3);
   if (flags & 4) { enReposo = true; desconexionManual = true; }   // la raqueta avisa de que se duerme
@@ -288,8 +411,28 @@ function mostrarBateria(dv) {
 
 function mostrarUmbral(u) { $('umbral').value = u; $('umbralTxt').textContent = u.toFixed(1) + ' g'; }
 
+// ---------- Pintado ----------
+function etiquetaTipo(t) {
+  if (!t) return calib ? '' : '<span class="tipo nocal">sin calibrar</span>';
+  return `<span class="tipo ${t}">${NOMBRE_TIPO[t]}</span>`;
+}
+
+function filaTabla(g) {
+  const t = tipoGolpe(g);
+  return `<td>${g.n}</td><td>${g.hora.toLocaleTimeString()}</td><td>${t ? `<span style="color:var(--${t === 'otro' ? 'muted' : t})">${NOMBRE_TIPO[t]}</span>` : '–'}</td>` +
+    `<td style="color:${color(g.intensidad)}">${g.intensidad}</td><td>${textoVel(g)}</td>` +
+    `<td>${g.g.toFixed(1)}${g.sat ? ' ⚠' : ''}</td><td>${g.peloteo || ''}</td>`;
+}
+
+function redibujarTabla() {
+  peloteos();
+  $('tabla').innerHTML = golpes.slice().reverse().map(g => `<tr>${filaTabla(g)}</tr>`).join('');
+  pintar();
+}
+
 // pintar(golpe) = golpe nuevo, pintar(null) = sesion borrada, pintar() = solo refrescar estadisticas
 function pintar(ult) {
+  const lista = peloteos();
   $('contador').textContent = golpes.length;
   if (ult) { $('contador').classList.remove('flash'); void $('contador').offsetWidth; $('contador').classList.add('flash'); }
   $('perdidos').textContent = perdidos ? `${perdidos} golpe(s) no recibidos por Bluetooth` : '';
@@ -299,45 +442,102 @@ function pintar(ult) {
     $('ultBarra').style.width = ult.intensidad + '%';
     $('ultBarra').style.background = color(ult.intensidad);
     $('ultG').textContent = ult.g.toFixed(1);
-    $('ultW').textContent = ult.dps;
-    $('ultSat').textContent = ult.sat ? '⚠ sensor al máximo' : '';
+    $('ultVel').textContent = textoVel(ult);
+    $('ultTipo').innerHTML = etiquetaTipo(tipoGolpe(ult));
+    $('ultSat').textContent = (ult.sat || velSaturada(ult)) ? '⚠ sensor al máximo' : '';
   } else if (ult === null) {
-    ['ultInt', 'ultG', 'ultW'].forEach(id => $(id).textContent = '–');
-    $('ultBarra').style.width = 0; $('ultSat').textContent = '';
+    ['ultInt', 'ultG', 'ultVel'].forEach(id => $(id).textContent = '–');
+    $('ultBarra').style.width = 0; $('ultSat').textContent = ''; $('ultTipo').innerHTML = '';
   }
 
-  if (golpes.length) {
+  // --- Golpeo ---
+  const ids = ['stMedia', 'stMax', 'stVelMedia', 'stVelMax', 'stDer', 'stRev', 'stOtro',
+               'stPeloteos', 'stPorPeloteo', 'stPeloteoMax', 'stActual', 'stJuego', 'stDescanso', 'stRitmo', 'stTendencia'];
+  if (!golpes.length) {
+    ids.forEach(id => $(id).textContent = '–');
+    ['repDer', 'repRev', 'repOtro'].forEach(id => $(id).style.width = 0);
+    $('stTendencia').className = 'n';
+  } else {
     const ints = golpes.map(x => x.intensidad);
-    $('stMedia').textContent = Math.round(ints.reduce((a, b) => a + b, 0) / ints.length);
+    $('stMedia').textContent = Math.round(media(ints));
     $('stMax').textContent = Math.max(...ints);
-    $('stG').textContent = Math.max(...golpes.map(x => x.g)).toFixed(1);
+
+    const conVel = golpes.filter(g => g.swing != null);
+    if (conVel.length) {
+      $('stVelMedia').textContent = Math.round(media(conVel.map(velocidad)));
+      const maxG = conVel.reduce((a, b) => (b.swing > a.swing ? b : a));
+      $('stVelMax').textContent = textoVel(maxG);
+    } else { $('stVelMedia').textContent = '–'; $('stVelMax').textContent = '–'; }
+
+    const tipos = golpes.map(tipoGolpe);
+    const nDer = tipos.filter(t => t === 'derecha').length, nRev = tipos.filter(t => t === 'reves').length, nOtro = tipos.filter(t => t === 'otro').length;
+    const nTot = nDer + nRev + nOtro;
+    $('stDer').textContent = calib ? nDer : '–'; $('stRev').textContent = calib ? nRev : '–'; $('stOtro').textContent = calib ? nOtro : '–';
+    $('repDer').style.width = nTot ? (nDer / nTot * 100) + '%' : 0;
+    $('repRev').style.width = nTot ? (nRev / nTot * 100) + '%' : 0;
+    $('repOtro').style.width = nTot ? (nOtro / nTot * 100) + '%' : 0;
+    $('stRepartoNota').textContent = !calib ? 'Calibra la derecha en Ajustes para separar derechas y reveses.'
+      : nTot ? `Derechas ${Math.round(nDer / nTot * 100)} % · Reveses ${Math.round(nRev / nTot * 100)} %. "Otros": saques, remates o golpes que no encajan.`
+      : 'Los golpes llegarán clasificados a partir de ahora.';
+
+    // --- Peloteos y ritmo ---
+    const largos = lista.filter(p => p.length >= 2);
+    $('stPeloteos').textContent = largos.length;
+    $('stPorPeloteo').textContent = largos.length ? media(largos.map(p => p.length)).toFixed(1) : '–';
+    $('stPeloteoMax').textContent = Math.max(...lista.map(p => p.length));
+    const actual = lista[lista.length - 1];
+    const sigueVivo = Date.now() - actual[actual.length - 1].hora <= PAUSA_PELOTEO_MS;
+    $('stActual').textContent = sigueVivo ? actual.length : '–';
+    // Tiempo jugando = duracion de cada peloteo + ~1,5 s por el ultimo golpe; descanso = el resto de la sesion
+    const juego = lista.reduce((s, p) => s + (p[p.length - 1].hora - p[0].hora) + 1500, 0);
+    const sesion = (sigueVivo ? Date.now() : golpes[golpes.length - 1].hora.getTime() + 1500) - golpes[0].hora;
+    $('stJuego').textContent = mmss(juego);
+    $('stDescanso').textContent = mmss(sesion - juego);
     const haceUnMin = Date.now() - 60000;
     $('stRitmo').textContent = golpes.filter(x => x.hora >= haceUnMin).length;
-  } else {
-    ['stMedia', 'stMax', 'stG', 'stRitmo'].forEach(id => $(id).textContent = '–');
+
+    // Tendencia (fatiga): intensidad media del ultimo 25 % de golpes frente al primer 25 %
+    if (golpes.length >= 20) {
+      const q = Math.floor(golpes.length / 4);
+      const ini = media(ints.slice(0, q)), fin = media(ints.slice(-q));
+      const cambio = ini ? Math.round((fin - ini) / ini * 100) : 0;
+      $('stTendencia').textContent = (cambio > 0 ? '+' : '') + cambio + ' %';
+      $('stTendencia').className = 'n ' + (cambio <= -10 ? 'mal' : cambio >= 5 ? 'bien' : '');
+      $('stTendenciaNota').textContent = cambio <= -10 ? 'Potencia: bajando (¿cansancio?)' : 'Potencia: final vs inicio';
+    } else {
+      $('stTendencia').textContent = '–'; $('stTendencia').className = 'n';
+      $('stTendenciaNota').textContent = `Potencia: final vs inicio (desde 20 golpes)`;
+    }
   }
 
-  // Grafica de barras
+  // --- Grafica: barras de intensidad + media movil de 5 golpes ---
   const ultimos = golpes.slice(-40), N = 40, W = 400, H = 160, paso = W / N;
   let svg = '';
   [25, 50, 75].forEach(v => svg += `<line x1="0" x2="${W}" y1="${H - v / 100 * H}" y2="${H - v / 100 * H}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>`);
   ultimos.forEach((x, i) => {
     const h = Math.max(2, x.intensidad / 100 * H);
-    svg += `<rect x="${i * paso + paso * .15}" y="${H - h}" width="${paso * .7}" height="${h}" rx="2" fill="${color(x.intensidad)}"><title>#${x.n}: ${x.intensidad}</title></rect>`;
+    svg += `<rect x="${i * paso + paso * .15}" y="${H - h}" width="${paso * .7}" height="${h}" rx="2" fill="${color(x.intensidad)}" opacity=".85"><title>#${x.n}: ${x.intensidad} · ${textoVel(x)} km/h</title></rect>`;
   });
+  const base = golpes.length - ultimos.length;
+  const puntos = ultimos.map((x, i) => {
+    const desde = Math.max(0, base + i - 4), ventana = golpes.slice(desde, base + i + 1).map(g => g.intensidad);
+    return `${(i * paso + paso / 2).toFixed(1)},${(H - media(ventana) / 100 * H).toFixed(1)}`;
+  });
+  if (puntos.length > 1) svg += `<polyline points="${puntos.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
   $('grafica').innerHTML = svg;
 
-  // Tabla (ultimo arriba)
+  // --- Tabla (ultimo arriba) ---
   $('tablaVacia').hidden = golpes.length > 0;
   if (ult) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${ult.n}</td><td>${ult.hora.toLocaleTimeString()}</td><td style="color:${color(ult.intensidad)}">${ult.intensidad}</td><td>${ult.g.toFixed(1)}${ult.sat ? ' ⚠' : ''}</td><td>${ult.dps}</td>`;
+    tr.innerHTML = filaTabla(ult);
     $('tabla').prepend(tr);
   } else if (ult === null) {
     $('tabla').innerHTML = '';
   }
 }
 
+// ---------- Controles ----------
 $('btnConectar').onclick = () => conectar();
 $('btnApagar').onclick = async () => {
   if (!confirm('¿Apagar la raqueta? Para encenderla otra vez, muévela.')) return;
@@ -351,26 +551,67 @@ $('btnCero').onclick = async () => {
   if (chControl) await chControl.writeValue(Uint8Array.of(0));
   golpes = []; perdidos = 0; pintar(null);
 };
+
+$('deporte').value = deporte;
+$('deporte').onchange = e => { deporte = e.target.value; guardar('deporte', deporte); redibujarTabla(); };
+
+if (calib) { $('btnCalibrar').textContent = 'Recalibrar derecha'; $('calibEstado').textContent = 'Calibrado ✓'; }
+$('btnCalibrar').onclick = () => {
+  if (calibrando) {   // segundo clic = cancelar
+    calibrando = 0;
+    $('calibEstado').textContent = calib ? 'Calibrado ✓' : '';
+    $('btnCalibrar').textContent = calib ? 'Recalibrar derecha' : 'Calibrar derecha';
+    return;
+  }
+  calibrando = GOLPES_CALIBRACION; calibSuma = [0, 0, 0];
+  $('btnCalibrar').textContent = 'Cancelar';
+  $('calibEstado').textContent = `Da ${GOLPES_CALIBRACION} derechas normales…`;
+};
+
 $('btnCsv').onclick = () => {
-  const filas = ['numero,hora,intensidad,pico_g,giro_dps,saturado',
-    ...golpes.map(x => [x.n, x.hora.toISOString(), x.intensidad, x.g, x.dps, x.sat ? 1 : 0].join(','))];
+  peloteos();
+  const filas = ['numero,hora,tipo,intensidad,velocidad_kmh,pico_g,giro_dps,swing_dps,gx,gy,gz,peloteo,saturado',
+    ...golpes.map(x => {
+      const v = velocidad(x);
+      return [x.n, x.hora.toISOString(), tipoGolpe(x) || '', x.intensidad, v == null ? '' : v.toFixed(1), x.g, x.dps,
+        x.swing ?? '', ...(x.v || ['', '', '']), x.peloteo, (x.sat || velSaturada(x)) ? 1 : 0].join(',');
+    })];
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([filas.join('\n')], { type: 'text/csv' }));
   a.download = `golpes-${new Date().toISOString().slice(0, 16).replace(':', '')}.csv`;
   a.click();
 };
-setInterval(() => { if (golpes.length) pintar(); }, 10000);  // refresca "golpes/min"
+setInterval(() => { if (golpes.length) pintar(); }, 5000);  // refresca ritmo, peloteo actual y tiempos
 
-// Modo demo para probar la interfaz sin placa: abre la pagina con ?demo
+// ---------- Modo demo (sin placa): abre la pagina con ?demo ----------
 if (new URLSearchParams(location.search).has('demo')) {
-  const b = document.createElement('button'); b.textContent = 'Simular golpe';
-  b.onclick = () => {
-    const i = Math.round(Math.random() * 100), dv = new DataView(new ArrayBuffer(12));
+  // Golpe simulado: derecha gira "hacia" (300, 120, -950); reves al reves
+  const simular = (hora, intensidadMedia = 55) => {
+    const i = Math.max(5, Math.min(100, Math.round(intensidadMedia + (Math.random() - .5) * 40)));
+    const r = Math.random(), sentido = r < .55 ? 1 : r < .9 ? -1 : 0;
+    const swing = Math.min(2000, 500 + i * 15);
+    const dir = sentido ? [300 * sentido, 120 * sentido, -950 * sentido] : [900, -200, 150];
+    const k = swing / Math.hypot(...dir);
+    const dv = new DataView(new ArrayBuffer(20));
     dv.setUint16(0, ultimoNumero + 1, true); dv.setUint16(2, Math.round((3 + i / 100 * 13) * 100), true);
-    dv.setUint16(4, Math.round(300 + i * 15), true); dv.setUint8(6, i); dv.setUint8(7, i > 97 ? 1 : 0);
-    alGolpe(dv);
+    dv.setUint16(4, Math.round(swing * 1.1), true); dv.setUint8(6, i); dv.setUint8(7, i > 97 ? 1 : 0);
+    dv.setUint32(8, 0, true); dv.setUint16(12, swing, true);
+    dir.forEach((d, j) => dv.setInt16(14 + j * 2, Math.round(d * k), true));
+    alGolpe(dv, hora);
   };
-  document.querySelector('header').appendChild(b);
+  const b1 = document.createElement('button'); b1.textContent = 'Simular golpe';
+  b1.onclick = () => simular(new Date());
+  const b2 = document.createElement('button'); b2.textContent = 'Simular sesión';
+  b2.onclick = () => {   // ~25 min de juego: peloteos de 2-9 golpes y potencia que baja al final
+    let t = Date.now() - 25 * 60000;
+    for (let p = 0; p < 30; p++) {
+      const n = 2 + Math.floor(Math.random() * 8);
+      for (let k = 0; k < n; k++) { simular(new Date(t), 65 - p * 0.8); t += 2000 + Math.random() * 1500; }
+      t += 15000 + Math.random() * 25000;
+    }
+    redibujarTabla();
+  };
+  document.querySelector('header').append(b1, b2);
   const bat = new DataView(new ArrayBuffer(4)); bat.setUint16(0, 3920, true); bat.setUint8(2, 70); bat.setUint8(3, 0);
   mostrarBateria(bat);
 }
