@@ -130,6 +130,7 @@
           <b id="umbralTxt">3.0 g</b>
         </label>
         <button id="btnCero" disabled>Contador a cero</button>
+        <button id="btnApagar" disabled>Apagar raqueta</button>
         <button id="btnCsv">Exportar CSV</button>
       </div>
       <p class="sub">Umbral bajo = cuenta golpes suaves (y más falsos positivos). Umbral alto = solo golpes fuertes.</p>
@@ -160,6 +161,13 @@ let dispositivo = null, chUmbral = null, chControl = null;
 let golpes = [];          // {n, hora, intensidad, g, dps, sat}
 let ultimoNumero = 0, perdidos = 0;
 let desconexionManual = false;
+let enReposo = false, reintento = null;
+
+// Manejadores con nombre: al reconectar, Chrome devuelve las mismas caracteristicas y
+// addEventListener con la misma funcion no la duplica (si no, cada golpe contaria doble).
+const onGolpe = e => alGolpe(e.target.value);
+const onUmbral = e => mostrarUmbral(e.target.value.getUint8(0) / 10);
+const onBateria = e => mostrarBateria(e.target.value);
 
 if (!navigator.bluetooth) { $('avisoNav').hidden = false; $('btnConectar').disabled = true; }
 
@@ -169,17 +177,19 @@ function ponerEstado(texto, on) {
   $('estado').textContent = texto;
   $('estado').classList.toggle('on', !!on);
   $('btnConectar').textContent = on ? 'Desconectar' : 'Conectar raqueta';
-  $('umbral').disabled = !on; $('btnCero').disabled = !on;
+  $('umbral').disabled = !on; $('btnCero').disabled = !on; $('btnApagar').disabled = !on;
 }
 
-async function conectar() {
-  if (dispositivo && dispositivo.gatt.connected) { desconexionManual = true; dispositivo.gatt.disconnect(); return; }
+// silencioso = reintento automatico (sin alertas ni cambios de estado si falla)
+async function conectar(silencioso = false) {
+  if (!silencioso) clearTimeout(reintento);
+  if (dispositivo && dispositivo.gatt.connected) { desconexionManual = true; enReposo = false; dispositivo.gatt.disconnect(); return true; }
   try {
     if (!dispositivo) {
       dispositivo = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICIO] }] });
       dispositivo.addEventListener('gattserverdisconnected', alDesconectar);
     }
-    ponerEstado('Conectando…');
+    if (!silencioso) ponerEstado('Conectando…');
     const server = await dispositivo.gatt.connect();
     const srv = await server.getPrimaryService(SERVICIO);
     const chGolpe = await srv.getCharacteristic(CH_GOLPE);
@@ -188,26 +198,39 @@ async function conectar() {
 
     mostrarUmbral((await chUmbral.readValue()).getUint8(0) / 10);
     await chUmbral.startNotifications();
-    chUmbral.addEventListener('characteristicvaluechanged', e => mostrarUmbral(e.target.value.getUint8(0) / 10));
+    chUmbral.addEventListener('characteristicvaluechanged', onUmbral);
 
     // El ultimo numero de golpe que tiene la placa sirve de referencia para detectar perdidas
     ultimoNumero = (await chGolpe.readValue()).getUint16(0, true);
     await chGolpe.startNotifications();
-    chGolpe.addEventListener('characteristicvaluechanged', e => alGolpe(e.target.value));
+    chGolpe.addEventListener('characteristicvaluechanged', onGolpe);
     // Bateria (opcional: firmwares antiguos no la tienen)
     try {
       const chBat = await srv.getCharacteristic(CH_BATERIA);
       mostrarBateria(await chBat.readValue());
       await chBat.startNotifications();
-      chBat.addEventListener('characteristicvaluechanged', e => mostrarBateria(e.target.value));
+      chBat.addEventListener('characteristicvaluechanged', onBateria);
     } catch (_) { $('bateria').hidden = true; }
 
+    enReposo = false;
     ponerEstado('Conectado: ' + (dispositivo.name || 'raqueta'), true);
     mantenerPantalla();
+    return true;
   } catch (err) {
+    if (silencioso) return false;
     if (err.name !== 'NotFoundError') alert('No se pudo conectar: ' + err.message);
     ponerEstado('Desconectado');
+    return false;
   }
+}
+
+// Reintenta conectar cada pocos segundos sin molestar (p. ej. mientras la raqueta duerme)
+function reconectarEnSegundoPlano(texto) {
+  ponerEstado(texto);
+  clearTimeout(reintento);
+  reintento = setTimeout(async () => {
+    if (!(await conectar(true))) reconectarEnSegundoPlano(texto);
+  }, 4000);
 }
 
 // Mantener la pantalla encendida mientras hay raqueta conectada (si el navegador lo permite)
@@ -221,8 +244,9 @@ document.addEventListener('visibilitychange', mantenerPantalla);
 
 function alDesconectar() {
   if (bloqueoPantalla) { bloqueoPantalla.release().catch(() => {}); bloqueoPantalla = null; }
-  ponerEstado('Desconectado');
-  if (!desconexionManual) { ponerEstado('Reconectando…'); setTimeout(conectar, 1000); }
+  if (enReposo) reconectarEnSegundoPlano('En reposo · muévela para despertarla');
+  else if (desconexionManual) ponerEstado('Desconectado');
+  else reconectarEnSegundoPlano('Reconectando…');
   desconexionManual = false;
 }
 
@@ -245,6 +269,7 @@ function alGolpe(dv) {
 
 function mostrarBateria(dv) {
   const mv = dv.getUint16(0, true), pct = dv.getUint8(2), flags = dv.getUint8(3);
+  if (flags & 4) { enReposo = true; desconexionManual = true; }   // la raqueta avisa de que se duerme
   const cargando = (flags & 1) === 1, sinBateria = (flags & 2) === 2;
   $('bateria').hidden = false;
   if (sinBateria) {
@@ -313,7 +338,12 @@ function pintar(ult) {
   }
 }
 
-$('btnConectar').onclick = conectar;
+$('btnConectar').onclick = () => conectar();
+$('btnApagar').onclick = async () => {
+  if (!confirm('¿Apagar la raqueta? Para encenderla otra vez, muévela.')) return;
+  enReposo = true; desconexionManual = true;
+  try { await chControl.writeValue(Uint8Array.of(1)); } catch (_) { /* ya se habra desconectado */ }
+};
 $('umbral').oninput = e => $('umbralTxt').textContent = (+e.target.value).toFixed(1) + ' g';
 $('umbral').onchange = async e => { if (chUmbral) await chUmbral.writeValue(Uint8Array.of(Math.round(e.target.value * 10))); };
 $('btnCero').onclick = async () => {
